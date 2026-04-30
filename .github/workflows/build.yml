@@ -1,25 +1,15 @@
-name: 编译 immortalwrt-mt798x-6.6
-
+name: 编译 immortalwrt-mt798x-6.6 (本地.config)
 on:
-  workflow_dispatch: # 手动触发
-    inputs:
-      device:
-        description: '选择设备型号'
-        required: true
-        default: 'mt7981-ax3000'
-        type: choice
-        options:
-          - mt7981-ax3000
-          - mt7986-ax6000
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - name: 检查仓库
+      - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 安装依赖
+      - name: 安装编译依赖
         run: |
           sudo apt update -y
           sudo apt install -y build-essential cmake git libncurses-dev python3
@@ -27,8 +17,11 @@ jobs:
 
       - name: 克隆源码
         run: |
-          git clone -b openwrt-24.10-6.6 --single-branch --filter=blob:none \
-          https://github.com/padavanonly/immortalwrt-mt798x-6.6 immortalwrt
+          git clone -b openwrt-24.10-6.6 --single-branch --filter=blob:none https://github.com/padavanonly/immortalwrt-mt798x-6.6 immortalwrt
+
+      - name: 放入你的 .config 文件
+        run: |
+          cp -f .config immortalwrt/.config
 
       - name: 更新 feeds
         working-directory: ./immortalwrt
@@ -36,27 +29,18 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: 加载设备配置
-        working-directory: ./immortalwrt
-        run: |
-          if [ "${{ github.event.inputs.device }}" = "mt7981-ax3000" ]; then
-            cp -f defconfig/mt7981-ax3000.config .config
-          elif [ "${{ github.event.inputs.device }}" = "mt7986-ax6000" ]; then
-            cp -f defconfig/mt7986-ax6000.config .config
-          fi
-
-      - name: 下载依赖
+      - name: 下载依赖包
         working-directory: ./immortalwrt
         run: make download -j$(nproc)
 
-      - name: 开始编译
+      - name: 开始编译固件
         working-directory: ./immortalwrt
         run: make -j$(nproc) V=s
 
       - name: 上传固件
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ github.event.inputs.device }}-firmware
+          name: immortalwrt-mt798x-firmware
           path: |
             immortalwrt/bin/targets/mediatek/mt7981/*
             immortalwrt/bin/targets/mediatek/mt7986/*
